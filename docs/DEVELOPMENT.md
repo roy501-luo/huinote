@@ -8,7 +8,7 @@
 open dist/会议助手.app
 ```
 
-`build.sh` 先校验并复用固定钥匙串组件，编译主程序，在临时目录组装并验证签名，最后复制到 `dist/会议助手.app`。当前使用 debug 构建，尚未提供公证发行流程。完整 Xcode 可运行 `swift test`；仅有 Command Line Tools 时优先使用验证脚本。
+`build.sh` 先校验并复用固定钥匙串组件，编译主程序，在临时目录组装并验证签名，最后复制到 `dist/会议助手.app`。默认使用 debug 构建；`MEETING_BUILD_CONFIGURATION=release` 使用优化构建，尚未提供公证发行流程。完整 Xcode 可运行 `swift test`；仅有 Command Line Tools 时优先使用验证脚本。
 
 环境变量：
 
@@ -29,3 +29,7 @@ git archive --format=zip --prefix=meeting-assistant-macos/ -o dist/meeting-assis
 ```
 
 源码 ZIP 不包含签名身份、Key、会议库或可运行二进制。公开发行安装包需要独立配置 Developer ID 签名和 Apple 公证；目前没有设置自动发布或自动更新。
+
+## Beta 发布包
+
+运行 `./scripts/package-beta.sh` 生成独立优化构建的 ZIP 和 SHA-256 校验文件，不替换日用 App。版本发布使用 Git 标签及 GitHub Pre-release；包内只有签名 App 和通用安装文档。发布前核验源码提交、架构、签名、解包和排除敏感数据。

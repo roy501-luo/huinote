@@ -15,6 +15,10 @@
 
 说话人编号不代表真实身份。当前不包含跨会议自动声纹认人、跨会议语义问答或云同步。
 
+## 下载测试版
+
+受邀用户可从 [GitHub Releases](https://github.com/roy501-luo/meeting-assistant-macos/releases) 下载预编译 Apple Silicon ZIP，无需安装开发工具。自签名未公证，首次打开方式及 Key 配置见 [安装说明](docs/INSTALL.md)。
+
 ## 快速开始
 
 要求 Apple Silicon、macOS 14+、Swift 6 工具链和 macOS SDK。开发验证环境为 macOS 26.2、Swift 6.3.1；其他系统版本尚未逐一验收。

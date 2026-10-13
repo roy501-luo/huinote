@@ -36,13 +36,15 @@ if [[ ! -f "$HELPER_DIR/stamp" || "$(cat "$HELPER_DIR/stamp")" != "$HELPER_STAMP
   print -r -- "$HELPER_STAMP" > "$HELPER_DIR/stamp"
 fi
 codesign --verify --strict "$HELPER_DIR/MeetingAssistantKeychain"
-swift build --disable-sandbox -c debug
+CONFIGURATION="${MEETING_BUILD_CONFIGURATION:-debug}"
+[[ "$CONFIGURATION" == debug || "$CONFIGURATION" == release ]] || { print -u2 "Invalid build configuration"; exit 1; }
+swift build --disable-sandbox -c "$CONFIGURATION"
 APP="${MEETING_APP_OUTPUT:-$PWD/dist/会议助手.app}"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/meeting-signed-build.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 STAGED="$STAGING/会议助手.app"
 mkdir -p "$STAGED/Contents/MacOS" "$STAGED/Contents/Resources"
-cp .build/debug/MeetingAssistant "$STAGED/Contents/MacOS/MeetingAssistant"
+cp ".build/$CONFIGURATION/MeetingAssistant" "$STAGED/Contents/MacOS/MeetingAssistant"
 cp "$HELPER_DIR/MeetingAssistantKeychain" "$STAGED/Contents/MacOS/MeetingAssistantKeychain"
 cp Resources/plaud_download.py "$STAGED/Contents/Resources/plaud_download.py"
 cp Resources/Info.plist "$STAGED/Contents/Info.plist"
