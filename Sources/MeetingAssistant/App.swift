@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
  @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
  @StateObject private var model = Model()
  var body: some Scene {
-  Window("会议助手",id:"main") {
+  Window("HuiNote · 会记",id:"main") {
    ContentView().environmentObject(model).frame(minWidth:1080,minHeight:640)
     .onAppear { delegate.model = model; NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps:true); model.runLaunchVerificationIfRequested() }
   }.defaultSize(width:1180,height:780)
@@ -31,7 +31,7 @@ struct ContentView: View {
  var body: some View {
   NavigationSplitView {
    VStack(alignment:.leading,spacing:16) {
-    HStack { Text("会议资料库").font(.headline).help("会议助手 " + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")); Spacer(); Button(action:model.new) { Image(systemName:"plus") }.help("新建会议").disabled(!model.canCreateMeeting) }
+    HStack { Text("会议资料库").font(.headline).help("HuiNote · 会记 " + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")); Spacer(); Button(action:model.new) { Image(systemName:"plus") }.help("新建会议").disabled(!model.canCreateMeeting) }
     Button("全部文件",systemImage:"square.grid.2x2") { model.showingLibrary = true; playback.pause() }.buttonStyle(.plain)
     TextField("全文搜索 · 标题、日期、正文",text:$model.query).textFieldStyle(.roundedBorder)
     List(model.meetings) { meeting in
@@ -68,7 +68,7 @@ struct ContentView: View {
     HStack(spacing:16) {
      Button { model.showingLibrary = true; playback.pause() } label: { Image(systemName:"chevron.left") }.buttonStyle(.plain).help("返回全部文件")
      VStack(alignment:.leading,spacing:5) {
-      TextField("会议标题",text:Binding(get:{model.current?.title ?? "会议助手"},set:{model.current?.title = $0; model.save()})).font(.title2.bold()).textFieldStyle(.plain).disabled(model.current == nil || model.currentSummaryLocked || model.qaBusy)
+      TextField("会议标题",text:Binding(get:{model.current?.title ?? "HuiNote · 会记"},set:{model.current?.title = $0; model.save()})).font(.title2.bold()).textFieldStyle(.plain).disabled(model.current == nil || model.currentSummaryLocked || model.qaBusy)
       Text(model.batchRunning ? "批量总结在后台处理中" : model.busy && !model.plaudProgress.isEmpty ? model.plaudProgress : model.busy ? (model.recording ? "正在停止录音并收齐尾部结果…" : "正在连接与启动…") : model.current?.status ?? "新建会议，开始记录").font(.caption).foregroundStyle(.secondary)
      }
      Spacer()
@@ -198,7 +198,7 @@ struct SettingsView: View {
    Section("Plaud 同步") {
     TextField("本地纪要目录",text:$plaudDirectory)
     TextField("原 Plaud 工具目录",text:$plaudTool)
-    Text("沿用原工具的 Plaud 登录，仅下载录音；后续使用会议助手的 ASR、模型与模板。现有纪要按文件编号去重导入，不覆盖本机编辑。下载后请选择待处理录音生成纪要。原目录与录音保留。").font(.caption).foregroundStyle(.secondary)
+    Text("沿用原工具的 Plaud 登录，仅下载录音；后续使用HuiNote · 会记的 ASR、模型与模板。现有纪要按文件编号去重导入，不覆盖本机编辑。下载后请选择待处理录音生成纪要。原目录与录音保留。").font(.caption).foregroundStyle(.secondary)
    }
    Section {
     Button("保存密钥到钥匙串") {

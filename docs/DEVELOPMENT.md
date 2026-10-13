@@ -5,10 +5,10 @@
 ```sh
 ./scripts/verify.sh
 ./scripts/build.sh
-open dist/会议助手.app
+open "dist/HuiNote · 会记.app"
 ```
 
-`build.sh` 先校验并复用固定钥匙串组件，编译主程序，在临时目录组装并验证签名，最后复制到 `dist/会议助手.app`。默认使用 debug 构建；`MEETING_BUILD_CONFIGURATION=release` 使用优化构建，尚未提供公证发行流程。完整 Xcode 可运行 `swift test`；仅有 Command Line Tools 时优先使用验证脚本。
+`build.sh` 先校验并复用固定钥匙串组件，编译主程序，在临时目录组装并验证签名，最后复制到 `dist/HuiNote · 会记.app`。默认使用 debug 构建；`MEETING_BUILD_CONFIGURATION=release` 使用优化构建，尚未提供公证发行流程。完整 Xcode 可运行 `swift test`；仅有 Command Line Tools 时优先使用验证脚本。
 
 环境变量：
 
@@ -33,3 +33,5 @@ git archive --format=zip --prefix=meeting-assistant-macos/ -o dist/meeting-assis
 ## Beta 发布包
 
 运行 `./scripts/package-beta.sh` 生成独立优化构建的 ZIP 和 SHA-256 校验文件，不替换日用 App。版本发布使用 Git 标签及 GitHub Pre-release；包内只有签名 App 和通用安装文档。发布前核验源码提交、架构、签名、解包和排除敏感数据。
+
+图标由 `scripts/generate-icon.swift` 以矢量绘制，可生成 16–1024 px 图标集；执行 `iconutil -c icns .build/HuiNote.iconset -o Resources/HuiNote.icns` 打包。应用显示名称为 HuiNote · 会记，Bundle ID、Keychain 服务与数据目录保持兼容。

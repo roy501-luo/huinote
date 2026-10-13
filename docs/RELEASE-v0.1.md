@@ -12,7 +12,7 @@
 
 ## 开始使用
 
-1. 下载下方 **MeetingAssistant-v0.1-arm64.zip**，解压后将 App 放入「应用程序」。
+1. 下载下方 **HuiNote-v0.1-arm64.zip**，解压后将 App 放入「应用程序」。
 2. 在设置中填写自己的百炼北京地域 ASR 和 LLM Key。
 3. 授权录音，开始会议。
 

@@ -118,7 +118,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
  private var stream: SCStream?
  private let captureQueue = DispatchQueue(label:"meeting.system.audio")
  func start(folder: URL, origin: Double = ProcessInfo.processInfo.systemUptime) async throws {
-  guard await AVCaptureDevice.requestAccess(for:.audio) else { throw AppFailure(message:"麦克风权限被拒绝。请在系统设置 → 隐私与安全性 → 麦克风中允许会议助手。") }
+  guard await AVCaptureDevice.requestAccess(for:.audio) else { throw AppFailure(message:"麦克风权限被拒绝。请在系统设置 → 隐私与安全性 → 麦克风中允许 HuiNote · 会记。") }
   let content: SCShareableContent
   do { content = try await SCShareableContent.excludingDesktopWindows(false,onScreenWindowsOnly:true) }
   catch { throw AppFailure(message:"无法获取系统音频采集权限：\(error.localizedDescription)。请检查系统设置 → 隐私与安全性 → 屏幕与系统音频录制。") }

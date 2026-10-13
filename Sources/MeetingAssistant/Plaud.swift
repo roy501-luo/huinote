@@ -47,7 +47,7 @@ enum PlaudImport {
   guard !post.minutes.isEmpty || audio(in:directory) != nil else { throw AppFailure(message:"Plaud 资料尚未生成完成") }
   if meeting.duration <= 0, let url = audio(in:directory), let audioFile = try? AVAudioFile(forReading:url) { meeting.duration = Double(audioFile.length)/audioFile.processingFormat.sampleRate }
   post.status = post.minutes.isEmpty ? "Plaud 录音已下载 · 待生成说话人稿与纪要" : "Plaud 纪要已导入 · 保留原稿"
-  post.warning = "来自 Plaud 同步目录；原始文件保留。导入纪要未经会议助手重新生成或校验。"
+  post.warning = "来自 Plaud 同步目录；原始文件保留。导入纪要未经 HuiNote · 会记重新生成或校验。"
   if post.sentences.isEmpty { post.warning += " 缺少带时间点的原文，暂不可基于纪要进行问答。" }
   post.minutesBasis = post.sentences.map { "\($0.id):[\($0.timeLabel)] \(post.name($0.speaker))：\($0.text)" }.joined(separator:"\n")
   meeting.post = post; meeting.status = "Plaud · " + (post.minutes.isEmpty ? "待处理录音" : "已导入")

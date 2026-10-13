@@ -1,5 +1,7 @@
 # HuiNote · 会记
 
+<img src="docs/images/app-icon.png" width="96" alt="HuiNote 图标" />
+
 **认真听，把会议留成可追溯的记录。**
 
 ![HuiNote 功能示意](https://github.com/user-attachments/assets/ad4760ae-78c5-4c94-8d63-d9496f3baab1)
@@ -21,7 +23,7 @@ Apple Silicon · macOS 14+ · 自备百炼 Key
 
 ## 三步开始
 
-1. [下载安装包](https://github.com/roy501-luo/huinote/releases/tag/v0.1)，将「会议助手.app」放入「应用程序」。
+1. [下载安装包](https://github.com/roy501-luo/huinote/releases/tag/v0.1)，将「HuiNote · 会记.app」放入「应用程序」。
 2. 打开设置，填写自己的百炼北京地域 ASR 和 LLM Key。
 3. 戴上耳机，授权录音，开始第一场会议。
 
@@ -35,7 +37,7 @@ SwiftUI · ScreenCaptureKit · AVAudioEngine · SQLite · Keychain
 
 ```sh
 ./scripts/build.sh
-open dist/会议助手.app
+open "dist/HuiNote · 会记.app"
 ./scripts/verify.sh
 ```
 
