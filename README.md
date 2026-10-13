@@ -1,4 +1,12 @@
-# 会议助手 · macOS
+# HuiNote · 会记
+
+**认真听，把会议留成可追溯的记录。**
+
+![HuiNote 功能示意](docs/images/overview.svg)
+
+[下载 v0.1](https://github.com/roy501-luo/huinote/releases/tag/v0.1) · [首次安装](docs/INSTALL.md) · [反馈问题](https://github.com/roy501-luo/huinote/issues)
+
+> 自签名预发布版 · Apple Silicon · macOS 14+ · 自备百炼 Key。图中均为示例内容。App 内暂沿用“会议助手”名称。
 
 面向 Apple Silicon 的原生中文 AI 会议助手。SwiftUI 界面、本地会议资料库、双路录音，接入阿里云百炼实时转写和会后处理。无需自建后端、账号系统或向量数据库。
 
@@ -17,7 +25,7 @@
 
 ## 下载测试版
 
-用户可从 [GitHub Releases](https://github.com/roy501-luo/meeting-assistant-macos/releases) 下载预编译 Apple Silicon ZIP，无需安装开发工具。自签名未公证，首次打开方式及 Key 配置见 [安装说明](docs/INSTALL.md)。
+用户可从 [GitHub Releases](https://github.com/roy501-luo/huinote/releases) 下载预编译 Apple Silicon ZIP，无需安装开发工具。自签名未公证，首次打开方式及 Key 配置见 [安装说明](docs/INSTALL.md)。
 
 ## 快速开始
 

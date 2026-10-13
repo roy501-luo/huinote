@@ -1,4 +1,4 @@
-# 会议助手 v0.1
+# HuiNote · 会记 v0.1
 
 首个公开下载的 macOS Apple Silicon 测试包。下载 ZIP 后将 App 放入「应用程序」，在设置中填写自己的百炼北京地域 ASR 与 LLM Key。
 

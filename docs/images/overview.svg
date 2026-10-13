@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="920" viewBox="0 0 1440 920">
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#edf5f0"/><stop offset="1" stop-color="#f7f4ed"/></linearGradient><filter id="shadow"><feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#123b2d" flood-opacity=".12"/></filter></defs>
+<rect width="1440" height="920" fill="url(#bg)"/>
+<g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif">
+<text x="80" y="83" fill="#1d654d" font-size="25" font-weight="650">HuiNote · 会记</text>
+<text x="80" y="151" fill="#19372c" font-size="49" font-weight="700">认真听，把会议留成可追溯的记录。</text>
+<text x="82" y="197" fill="#657b70" font-size="23">原生 macOS · 双路录音 · 中文转写 · 模板纪要 · 原文问答</text>
+<rect x="80" y="240" width="1280" height="550" rx="18" fill="white" filter="url(#shadow)"/>
+<path d="M98 240H1342Q1360 240 1360 258V292H80V258Q80 240 98 240" fill="#f8faf9"/>
+<circle cx="104" cy="266" r="6" fill="#ee8c83"/><circle cx="125" cy="266" r="6" fill="#eac36c"/><circle cx="146" cy="266" r="6" fill="#8ec1a0"/>
+<text x="198" y="273" font-size="16" fill="#43594e">示例会议 · 产品周会</text><text x="1190" y="273" font-size="14" fill="#83958b">功能示意</text>
+<rect x="80" y="292" width="224" height="498" fill="#f4f7f5"/>
+<text x="105" y="332" font-size="18" font-weight="600" fill="#294e3b">会议资料库</text>
+<rect x="100" y="352" width="183" height="35" rx="8" fill="#e8eee9"/><text x="112" y="375" font-size="13" fill="#7d9083">搜索标题、日期、正文</text>
+<rect x="94" y="413" width="198" height="75" rx="9" fill="#deece3"/>
+<text x="110" y="441" font-size="15" fill="#254b36">产品周会</text><text x="110" y="469" font-size="12" fill="#789382">示例 · 纪要已生成</text>
+<text x="110" y="521" font-size="15" fill="#547060">项目讨论</text><text x="110" y="547" font-size="12" fill="#8ca092">示例 · 本地保存</text>
+<text x="339" y="330" font-size="16" fill="#1e7250">转写</text><text x="402" y="330" font-size="16" fill="#6a7d70">总结</text><text x="465" y="330" font-size="16" fill="#6a7d70">笔记</text>
+<rect x="333" y="348" width="619" height="70" rx="12" fill="#f6f8f6"/>
+<circle cx="363" cy="383" r="17" fill="#247453"/><path d="M359 374L371 383L359 392Z" fill="white"/>
+<rect x="400" y="380" width="437" height="4" rx="2" fill="#dce6de"/><rect x="400" y="380" width="176" height="4" rx="2" fill="#3e906e"/>
+<text x="856" y="388" font-size="13" fill="#69816f">02:36</text>
+<text x="339" y="460" font-size="13" fill="#829587">00:12  ·  说话人 1</text>
+<text x="339" y="493" font-size="17" fill="#354d3c">今天先确认本周目标，再梳理尚未解决的问题。</text>
+<rect x="326" y="517" width="626" height="107" rx="10" fill="#eef7ee"/>
+<text x="339" y="546" font-size="13" fill="#408663">02:36  ·  说话人 2</text>
+<text x="339" y="580" font-size="17" fill="#274e36">先完成原型验证。负责人和截止时间还需要确认。</text>
+<text x="339" y="674" font-size="13" fill="#829587">03:08  ·  说话人 1</text>
+<text x="339" y="707" font-size="17" fill="#354d3c">这部分记为待办，下次会议继续跟进。</text>
+<path d="M980 292V790" stroke="#e6ece6"/>
+<text x="1009" y="333" font-size="18" fill="#315b41" font-weight="600">本场问答</text><text x="1313" y="332" font-size="20" fill="#859b8b">›</text>
+<rect x="1005" y="360" width="329" height="59" rx="10" fill="#f0f5f0"/><text x="1022" y="395" font-size="16" fill="#476c51">下一步要做什么？</text>
+<text x="1014" y="466" font-size="16" fill="#425e49">“先完成原型验证。”</text><text x="1014" y="499" font-size="14" fill="#81917f">负责人、期限：未明确</text>
+<rect x="1012" y="522" width="164" height="32" rx="8" fill="#e6f0e6"/><text x="1024" y="543" font-size="13" fill="#43835a">↗ 02:36 · 查看原文</text>
+<text x="1014" y="734" font-size="13" fill="#88978b">可收起 · 引用可返回转写</text>
+<text x="83" y="852" font-size="20" fill="#355a43">记录 → 核对 → 总结 → 找回依据</text>
+<text x="83" y="883" font-size="14" fill="#7a8e7f">界面与文案为功能示意，不是真实会议截图或识别效果证明。实际 UI 以下载版本为准。</text>
+<text x="1265" y="864" font-size="24" fill="#397455">v0.1</text>
+</g></svg>
