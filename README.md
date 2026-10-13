@@ -2,7 +2,7 @@
 
 **认真听，把会议留成可追溯的记录。**
 
-![HuiNote 功能示意](docs/images/overview.svg)
+![HuiNote 功能示意](docs/images/overview.png)
 
 [下载 v0.1](https://github.com/roy501-luo/huinote/releases/tag/v0.1) · [首次安装](docs/INSTALL.md) · [反馈问题](https://github.com/roy501-luo/huinote/issues)
 
