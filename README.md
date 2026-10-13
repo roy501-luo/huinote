@@ -17,7 +17,7 @@
 
 ## 下载测试版
 
-受邀用户可从 [GitHub Releases](https://github.com/roy501-luo/meeting-assistant-macos/releases) 下载预编译 Apple Silicon ZIP，无需安装开发工具。自签名未公证，首次打开方式及 Key 配置见 [安装说明](docs/INSTALL.md)。
+用户可从 [GitHub Releases](https://github.com/roy501-luo/meeting-assistant-macos/releases) 下载预编译 Apple Silicon ZIP，无需安装开发工具。自签名未公证，首次打开方式及 Key 配置见 [安装说明](docs/INSTALL.md)。
 
 ## 快速开始
 

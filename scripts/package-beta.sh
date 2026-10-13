@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -eu
 cd "${0:A:h:h}"
-VERSION=v0.4.1-beta.1
+VERSION=v0.1
 ROOT="$PWD/dist/beta-stage"
 MEETING_BUILD_CONFIGURATION=release MEETING_APP_OUTPUT="$ROOT/会议助手.app" ./scripts/build.sh
 cp docs/INSTALL.md "$ROOT/INSTALL.md"

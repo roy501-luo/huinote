@@ -4,7 +4,7 @@
 
 ## 下载和打开
 
-1. 由有仓库访问权限的 GitHub 账号登录，在 Release 的 Assets 中下载 `MeetingAssistant-v0.4.1-beta.1-arm64.zip`。不要选择 Source code，它是源码。
+1. 在 GitHub Release 的 Assets 中下载 `MeetingAssistant-v0.1-arm64.zip`。不要选择 Source code，它是源码。
 2. 解压，将「会议助手.app」拖入「应用程序」，以后固定从该位置启动。包内不包含任何人的 API Key 或会议数据。
 3. 本测试版采用自签名，未通过 Apple 公证。首次打开可能提示无法验证开发者。如确认下载来源，尝试打开后，在「系统设置 → 隐私与安全性」找到对应提示，选择「仍要打开」，并按 macOS 提示确认。系统版本或设备管理策略可能不允许放行；遇到这种情况请联系维护者，不要关闭 Gatekeeper、SIP 或安装根证书。
 4. 如需核对下载完整性，在终端运行 `shasum -a 256` 加 ZIP 文件路径，与 Release 的 `SHA256SUMS.txt` 对比。
