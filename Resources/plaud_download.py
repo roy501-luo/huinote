@@ -21,7 +21,19 @@ def main():
     collector = build_collector(settings)
     known = set(json.loads(exclusion.read_text()))
     # Explicitly request all available records rather than the old tool's recent-days default.
-    files = collector.list_files(days=0, limit=0)
+    from plaud_notes.plaud_cn_client import PlaudCNAuthError
+    from plaud_notes.plaud_client import PlaudAuthError
+    refreshed_login = False
+    try:
+        files = collector.list_files(days=0, limit=0)
+    except (PlaudCNAuthError, PlaudAuthError):
+        from plaud_notes.cli import cmd_login
+        import argparse
+        if cmd_login(argparse.Namespace()) != 0:
+            return 4
+        refreshed_login = True
+        collector = build_collector(settings)
+        files = collector.list_files(days=0, limit=0)
     if len(sys.argv) > 5 and sys.argv[4] == "verify-one":
         files = [item for item in files if item.id == sys.argv[5]]
         if not files:
@@ -35,7 +47,18 @@ def main():
             continue
         try:
             folder.mkdir(parents=True, exist_ok=True)
-            audio, _ = collector.download_audio(item.id, folder, stem='audio')
+            try:
+                audio, _ = collector.download_audio(item.id, folder, stem='audio')
+            except (PlaudCNAuthError, PlaudAuthError):
+                if refreshed_login:
+                    raise
+                from plaud_notes.cli import cmd_login
+                import argparse
+                if cmd_login(argparse.Namespace()) != 0:
+                    return 4
+                refreshed_login = True
+                collector = build_collector(settings)
+                audio, _ = collector.download_audio(item.id, folder, stem='audio')
             staged = folder / 'audio.partial.mp3'
             subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', str(audio),
                             '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', str(staged)],

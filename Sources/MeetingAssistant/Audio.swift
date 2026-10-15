@@ -32,9 +32,18 @@ final class AudioWriter: @unchecked Sendable {
  private var diskExpected: [String:Double] = [:]
  private var meetingOrigin = ProcessInfo.processInfo.systemUptime
 
- func begin(folder: URL, origin: Double = ProcessInfo.processInfo.systemUptime) { queue.sync {
+ func begin(folder: URL, origin: Double = ProcessInfo.processInfo.systemUptime, appendExisting: Bool = false) throws { try queue.sync {
   self.folder = folder; files = [:]; formats = [:]; counts = [:]; health = [:]; lastUpdate = [:]; enabled = true
   segments = []; diskExpected = [:]
+  if appendExisting {
+   let manifest = folder.appendingPathComponent("segments.json")
+   let names = try FileManager.default.contentsOfDirectory(atPath:folder.path)
+   if FileManager.default.fileExists(atPath:manifest.path) { segments = try JSONDecoder().decode([AudioSegment].self,from:Data(contentsOf:manifest)) }
+   else if names.contains(where:{$0.hasSuffix(".caf")}) { enabled = false; throw AppFailure(message:"缺少录音时间线，已保留原文件，不能继续录音") }
+   for source in ["system","microphone"] {
+    counts[source] = names.filter{$0.hasPrefix(source+"-") && $0.hasSuffix(".caf")}.compactMap { Int($0.dropFirst(source.count+1).dropLast(4)) }.max() ?? 0
+   }
+  }
   encoders = [:]; pending = [:]; origins = [:]; sentBytes = [:]; expectedInput = [:]; encodingFailed = []; meetingOrigin = origin
  } }
  func append(_ buffer: AVAudioPCMBuffer, source: String, hostSeconds: Double? = nil) {
@@ -113,18 +122,46 @@ final class AudioWriter: @unchecked Sendable {
  }
 }
 final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
+ static var microphoneDevices: [AVCaptureDevice] { AVCaptureDevice.devices(for:.audio) }
  let writer = AudioWriter()
- private var engine: AVAudioEngine?
+ @MainActor private var engine: AVAudioEngine?
+ @MainActor private var configurationObserver: NSObjectProtocol?
+ @MainActor private var microphoneRestarts = 0
+ @MainActor private var lastMicrophoneRestart = 0.0
  private var stream: SCStream?
  private let captureQueue = DispatchQueue(label:"meeting.system.audio")
- func start(folder: URL, origin: Double = ProcessInfo.processInfo.systemUptime) async throws {
+ @MainActor func start(folder: URL, origin: Double = ProcessInfo.processInfo.systemUptime, appendExisting: Bool = false) async throws {
   guard await AVCaptureDevice.requestAccess(for:.audio) else { throw AppFailure(message:"麦克风权限被拒绝。请在系统设置 → 隐私与安全性 → 麦克风中允许 HuiNote · 会记。") }
   let content: SCShareableContent
   do { content = try await SCShareableContent.excludingDesktopWindows(false,onScreenWindowsOnly:true) }
   catch { throw AppFailure(message:"无法获取系统音频采集权限：\(error.localizedDescription)。请检查系统设置 → 隐私与安全性 → 屏幕与系统音频录制。") }
   guard let display = content.displays.first else { throw AppFailure(message:"没有可用显示器，无法启动系统音频采集。") }
-  writer.begin(folder:folder,origin:origin)
+  try writer.begin(folder:folder,origin:origin,appendExisting:appendExisting)
   do {
+   microphoneRestarts = 0
+   if #available(macOS 15.0, *) {} else { try startMicrophone() }
+   let config = SCStreamConfiguration()
+   if #available(macOS 15.0, *) {
+    let selected = UserDefaults.standard.string(forKey:"microphoneDeviceID") ?? ""
+    if !selected.isEmpty && !Self.microphoneDevices.contains(where:{$0.uniqueID == selected}) {
+     throw AppFailure(message:"所选麦克风未连接，请在设置 → 录音中选择可用设备。")
+    }
+    config.captureMicrophone = true
+    config.microphoneCaptureDeviceID = selected.isEmpty ? nil : selected
+   }
+   config.capturesAudio = true; config.excludesCurrentProcessAudio = true
+   config.sampleRate = 48000; config.channelCount = 2
+   config.width = 2; config.height = 2; config.minimumFrameInterval = CMTime(seconds:1,preferredTimescale:1)
+   let stream = SCStream(filter:SCContentFilter(display:display,excludingApplications:[],exceptingWindows:[]),configuration:config,delegate:self)
+   try stream.addStreamOutput(self,type:.audio,sampleHandlerQueue:captureQueue)
+   if #available(macOS 15.0, *) { try stream.addStreamOutput(self,type:.microphone,sampleHandlerQueue:captureQueue) }
+   self.stream = stream
+   try await stream.startCapture()
+  } catch { await stop(); throw error }
+ }
+ @MainActor private func startMicrophone() throws {
+  if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver); self.configurationObserver = nil }
+  engine?.inputNode.removeTap(onBus:0); engine?.stop(); engine = nil
    let engine = AVAudioEngine()
    let input = engine.inputNode
    let format = input.outputFormat(forBus:0)
@@ -136,17 +173,19 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
    }
    self.engine = engine
    try engine.start()
-   let config = SCStreamConfiguration()
-   config.capturesAudio = true; config.excludesCurrentProcessAudio = true
-   config.sampleRate = 48000; config.channelCount = 2
-   config.width = 2; config.height = 2; config.minimumFrameInterval = CMTime(seconds:1,preferredTimescale:1)
-   let stream = SCStream(filter:SCContentFilter(display:display,excludingApplications:[],exceptingWindows:[]),configuration:config,delegate:self)
-   try stream.addStreamOutput(self,type:.audio,sampleHandlerQueue:captureQueue)
-   self.stream = stream
-   try await stream.startCapture()
-  } catch { await stop(); throw error }
+  configurationObserver = NotificationCenter.default.addObserver(forName:.AVAudioEngineConfigurationChange,object:engine,queue:.main) { [weak self] _ in
+   Task { @MainActor in self?.recoverMicrophone() }
+  }
  }
- func stop() async {
+ @MainActor @discardableResult func recoverMicrophone() -> Bool {
+  guard engine != nil else { return false }
+  if ProcessInfo.processInfo.systemUptime-lastMicrophoneRestart <= 4 { return true }
+  guard microphoneRestarts < 2 else { return false }
+  microphoneRestarts += 1; lastMicrophoneRestart = ProcessInfo.processInfo.systemUptime
+  do { try startMicrophone(); return true } catch { writer.report("microphone","麦克风重新连接失败："+error.localizedDescription); return false }
+ }
+ @MainActor func stop() async {
+  if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver); self.configurationObserver = nil }
   engine?.inputNode.removeTap(onBus:0); engine?.stop(); engine = nil
   if let stream {
    do { try await stream.stopCapture() } catch { writer.report("system","停止系统采集失败：\(error.localizedDescription)") }
@@ -157,14 +196,18 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
  }
  func stream(_ stream: SCStream, didStopWithError error: Error) { writer.report("system","采集中断：\(error.localizedDescription)") }
  func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-  guard type == .audio, sampleBuffer.isValid,
+  let source: String
+  if type == .audio { source = "system" }
+  else if #available(macOS 15.0, *), type == .microphone { source = "microphone" }
+  else { return }
+  guard sampleBuffer.isValid,
    let description = sampleBuffer.formatDescription else { return }
   let format = AVAudioFormat(cmAudioFormatDescription:description)
   let count = CMSampleBufferGetNumSamples(sampleBuffer)
   guard count > 0, let pcm = AVAudioPCMBuffer(pcmFormat:format,frameCapacity:AVAudioFrameCount(count)) else { return }
   pcm.frameLength = AVAudioFrameCount(count)
   let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer,at:0,frameCount:Int32(count),into:pcm.mutableAudioBufferList)
-  guard status == noErr else { writer.report("system","系统音频格式转换失败（\(status)）"); return }
-  writer.append(pcm,source:"system",hostSeconds:CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds)
+  guard status == noErr else { writer.report(source,"音频格式转换失败（\(status)）"); return }
+  writer.append(pcm,source:source,hostSeconds:CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds)
  }
 }

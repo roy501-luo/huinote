@@ -61,9 +61,15 @@ enum PlaudImport {
   var known = Set(try store.list().compactMap{$0.plaud?.fileID}); var report = PlaudImportReport()
   for folder in folders where FileManager.default.fileExists(atPath:folder.appendingPathComponent("meta.json").path) {
    do {
-    let meeting = try read(folder)
+    var meeting = try read(folder)
     guard let origin = meeting.plaud else { continue }
     if known.contains(origin.fileID) { report.skipped += 1; continue }
+    let owned = store.root.appendingPathComponent("PlaudArchive").appendingPathComponent(meeting.id)
+    if !FileManager.default.fileExists(atPath:owned.path) {
+     try FileManager.default.createDirectory(at:owned.deletingLastPathComponent(),withIntermediateDirectories:true)
+     try FileManager.default.copyItem(at:folder,to:owned)
+    }
+    meeting.plaud?.directory = owned.path
     try store.save(meeting); known.insert(origin.fileID); report.added += 1
    } catch { report.failed += 1 }
   }
@@ -81,6 +87,7 @@ enum PlaudImport {
   p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
   var env = ProcessInfo.processInfo.environment; env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"; p.environment = env
   try p.run(); p.waitUntilExit()
-  guard p.terminationStatus == 0 else { throw AppFailure(message:"Plaud 下载未全部完成（退出码 \(p.terminationStatus)）。请确认原工具登录态、网络及 ffmpeg；已下载资料保留，可重试。登录请使用下方“Plaud 登录”。") }
+  if p.terminationStatus == 4 { throw AppFailure(message:"Plaud 登录未完成。再次点击同步即可重新登录并继续，已下载资料保留。") }
+  guard p.terminationStatus == 0 else { throw AppFailure(message:"Plaud 下载未全部完成（退出码 \(p.terminationStatus)）。请确认原工具登录态、网络及 ffmpeg；已下载资料保留，可重试。登录失效时会自动打开登录窗口。") }
  }
 }

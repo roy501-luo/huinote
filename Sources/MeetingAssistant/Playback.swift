@@ -72,6 +72,7 @@ import AVFoundation
     if !player.isPlaying { self.position = self.duration; self.pause() }
    }
   }
+  timer?.tolerance = 0.05
  }
  func changeRate(_ value: Float) { rate = value; player?.rate = value }
 }
@@ -82,7 +83,7 @@ struct MeetingPlayerView: View {
  var body: some View {
   VStack(spacing:10) {
    HStack(spacing:14) {
-    Button { player.toggle() } label: { Image(systemName:player.playing ? "pause.fill" : "play.fill").font(.title3).frame(width:30,height:30) }.buttonStyle(.borderless).help(player.playing ? "暂停录音" : "播放录音").accessibilityLabel(player.playing ? "暂停录音" : "播放录音")
+    Button { player.toggle() } label: { Image(systemName:player.playing ? "pause.fill" : "play.fill").font(.title3).frame(width:30,height:30) }.buttonStyle(.borderless).help(player.playing ? "暂停播放" : "播放录音").accessibilityLabel(player.playing ? "暂停播放" : "播放录音")
     Button { player.seek(player.position-15) } label: { Image(systemName:"gobackward.15") }.buttonStyle(.borderless).help("后退15秒")
     Slider(value:Binding(get:{player.position},set:{player.seek($0)}),in:0...max(1,player.duration)).accessibilityLabel("音频播放进度")
     Text(time(player.position)+" / "+time(player.duration)).monospacedDigit().font(.caption).foregroundStyle(.secondary)

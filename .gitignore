@@ -22,3 +22,5 @@ Verification/Fixtures/
 *.mp3
 *.m4a
 *.ogg
+
+__pycache__/

@@ -13,7 +13,7 @@ enum MeetingMix {
   let manifest = folder.appendingPathComponent("segments.json")
   let files = try imported.map { [$0] } ?? manager.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil).filter { $0.pathExtension == "caf" && ($0.lastPathComponent.hasPrefix("system-") || $0.lastPathComponent.hasPrefix("microphone-")) }
   guard !files.isEmpty else { throw AppFailure(message:"没有本地录音文件") }
-  var warning = imported == nil ? "" : "Plaud 单路录音。"
+  var warning = imported == nil ? "" : "导入的单路音轨。"
   let segments: [AudioSegment]
   if let imported {
    segments = [AudioSegment(file:imported.lastPathComponent,start:0)]
@@ -36,7 +36,7 @@ enum MeetingMix {
    guard !segment.file.contains("/"), files.contains(where:{$0.lastPathComponent == segment.file}), segment.start.isFinite, segment.start >= 0 else { throw AppFailure(message:"录音时间线包含无效文件或时间") }
    let file = try AVAudioFile(forReading:imported ?? folder.appendingPathComponent(segment.file))
    let duration = Double(file.length)/file.processingFormat.sampleRate
-   guard duration > 0, segment.start + duration <= 7200 else { throw AppFailure(message:"说话人分离当前支持两小时以内的有效录音；原始录音仍完整保留") }
+   guard duration > 0, segment.start + duration <= 43200 else { throw AppFailure(message:"会后识别支持十二小时以内的有效录音；原始录音仍完整保留") }
    let url = work.appendingPathComponent("\(index).pcm")
    manager.createFile(atPath:url.path,contents:nil)
    let handle = try FileHandle(forWritingTo:url)
@@ -57,7 +57,8 @@ enum MeetingMix {
    let start = Int64((segment.start*16000).rounded())
    parts.append((url,start,size/2)); total = max(total,start+size/2)
   }
-  guard total > 0, total <= 7200*16000+32 else { throw AppFailure(message:"混音时长超出两小时支持范围") }
+  guard total > 0, total <= 43200*16000+32 else { throw AppFailure(message:"混音时长超出十二小时支持范围") }
+  if total > 7200*16000 { warning += " 录音超过两小时，服务建议说话人分离使用较短录音；本次保留完整音轨处理，请重点核对说话人编号。" }
   let staged = work.appendingPathComponent("mixed.wav")
   manager.createFile(atPath:staged.path,contents:nil)
   let output = try FileHandle(forWritingTo:staged); defer { try? output.close() }

@@ -76,6 +76,27 @@ struct ASREvent {
  }
 }
 
+enum ASRNetworkFailure {
+ static func retryable(_ error: Error, httpStatus: Int?) -> Bool {
+  if let httpStatus, [400,401,403,404].contains(httpStatus) { return false }
+  if error is AppFailure || error is CancellationError { return false }
+  let e = error as NSError
+  if e.domain == NSURLErrorDomain {
+   return ![NSURLErrorCancelled,NSURLErrorBadURL,NSURLErrorUnsupportedURL,NSURLErrorUserAuthenticationRequired,NSURLErrorSecureConnectionFailed,NSURLErrorServerCertificateUntrusted,NSURLErrorServerCertificateHasBadDate,NSURLErrorClientCertificateRequired,NSURLErrorClientCertificateRejected].contains(e.code)
+  }
+  // URLSession WebSockets can surface POSIX reset/closed-stream errors directly.
+  if e.domain == NSPOSIXErrorDomain { return ![Int(EACCES),Int(EPERM),Int(EINVAL)].contains(e.code) }
+  return true
+ }
+}
+struct TranscriptUpdateGate {
+ private var last = -Double.infinity
+ mutating func accepts(final: Bool, now: Double) -> Bool {
+  if final { return true }
+  guard now-last >= 0.2 else { return false }
+  last = now; return true
+ }
+}
 actor ASRConnection {
  let taskID = UUID().uuidString
  let source: String
@@ -85,12 +106,19 @@ actor ASRConnection {
  private(set) var sentSeconds: Double = 0
  private(set) var interimCount = 0
  private(set) var finalCount = 0
+ private var retryableFailure = true
+ func canRetry() -> Bool { retryableFailure }
+ private var pendingSentences = Set<String>()
+ private var displayGate = TranscriptUpdateGate()
  private var offset: Double = 0
  private var offsetSet = false
  private var socket: URLSessionWebSocketTask?
  private var session: URLSession?
  private var receiver: Task<Void,Never>?
  private var timeout: Task<Void,Never>?
+ private var pingLoop: Task<Void,Never>?
+ private var pingTimeout: Task<Void,Never>?
+ private var pingID: UUID?
  private var onSentence: (@Sendable (Transcript) async -> Void)?
  private var onState: (@Sendable (ASRState,String?,Double) async -> Void)?
  func configure(onSentence: @escaping @Sendable (Transcript) async -> Void, onState: @escaping @Sendable (ASRState,String?,Double) async -> Void) {
@@ -105,6 +133,7 @@ actor ASRConnection {
   await transition(.connecting)
   let config = URLSessionConfiguration.ephemeral
   config.timeoutIntervalForRequest = 15
+  VerificationNetwork.configure(config)
   let session = URLSession(configuration:config); self.session = session
   var request = URLRequest(url:configuration.endpoint)
   request.setValue("Bearer " + configuration.key,forHTTPHeaderField:"Authorization")
@@ -117,9 +146,18 @@ actor ASRConnection {
    while state == .connecting { try await Task.sleep(nanoseconds:25_000_000) }
    guard state == .running else { throw AppFailure(message:failure ?? "ASR 未启动") }
    timeout?.cancel(); timeout = nil
-  } catch { if state != .failed { await fail("ASR 连接失败，请检查网络、北京地域 Key 和服务权限。") }; throw AppFailure(message:failure ?? "ASR 连接失败") }
+   pingLoop = Task { [weak self] in
+    while !Task.isCancelled {
+     do { try await Task.sleep(nanoseconds:10_000_000_000) } catch { return }
+     await self?.ping()
+    }
+   }
+  } catch { if state != .failed { await fail("ASR 连接失败，请检查网络、北京地域 Key 和服务权限。",retryable:![401,403,404].contains((socket.response as? HTTPURLResponse)?.statusCode ?? 0)) }; throw AppFailure(message:failure ?? "ASR 连接失败") }
  }
  func send(_ packet: AudioPacket) async {
+  while state == .idle || state == .connecting {
+   do { try await Task.sleep(nanoseconds:25_000_000) } catch { return }
+  }
   guard state == .running, let socket else { return }
   if !offsetSet { offset = packet.offset; lastFinalEnd = offset; offsetSet = true }
   // Packet timestamps reflect the common meeting clock; excessive capture gaps are explicit.
@@ -138,12 +176,29 @@ actor ASRConnection {
    while state == .finishing { try await Task.sleep(nanoseconds:25_000_000) }
   } catch { await fail("结束任务失败，尾部结果可能缺失。") }
  }
- func fail(_ message: String) async {
+ func fail(_ message: String, retryable: Bool = true) async {
   guard state != .failed && state != .finished else { return }
+  retryableFailure = retryable
   failure = message; state = .failed; close(); await onState?(.failed,failure,lastFinalEnd)
  }
  func cancel() async { if state != .finished && state != .failed { await fail("转写任务已取消，未确认结果可能缺失。") }; close() }
+ private func ping() {
+  guard state == .running, let socket else { return }
+  let id = UUID(); pingID = id
+  pingTimeout?.cancel()
+  pingTimeout = Task { [weak self] in
+   do { try await Task.sleep(nanoseconds:8_000_000_000) } catch { return }
+   await self?.fail("网络心跳超时，切换本地录音并自动重连。")
+  }
+  socket.sendPing { [weak self] error in Task { await self?.pingCompleted(id,error:error) } }
+ }
+ private func pingCompleted(_ id: UUID,error: Error?) async {
+  guard pingID == id else { return }
+  pingTimeout?.cancel(); pingTimeout = nil; pingID = nil
+  if error != nil { await fail("网络心跳中断，切换本地录音并自动重连。") }
+ }
  private func close() {
+  pingLoop?.cancel(); pingLoop = nil; pingTimeout?.cancel(); pingTimeout = nil; pingID = nil
   timeout?.cancel(); timeout = nil
   socket?.cancel(with:.normalClosure,reason:nil); socket = nil
   receiver?.cancel(); receiver = nil
@@ -172,18 +227,20 @@ actor ASRConnection {
     case .started: if state == .connecting { await transition(.running) }
     case .sentence:
      if let sentence = event.sentence, state == .running || state == .finishing {
+      if sentence.final { pendingSentences.remove(sentence.id) } else { pendingSentences.insert(sentence.id) }
       if sentence.final { lastFinalEnd = max(lastFinalEnd,sentence.end ?? sentence.begin); finalCount += 1 } else { interimCount += 1 }
-      await onSentence?(sentence)
+      if displayGate.accepts(final:sentence.final,now:ProcessInfo.processInfo.systemUptime) { await onSentence?(sentence) }
      }
     case .finished:
      guard state == .finishing else { await fail("服务提前结束任务，后续转写缺失。"); return }
+     guard pendingSentences.isEmpty else { await fail("服务结束仍有未确认句子，将由会后录音补齐。",retryable:false); return }
      await transition(.finished); close(); return
-    case .failed: await fail(event.error ?? "ASR 任务失败"); return
+    case .failed: await fail(event.error ?? "ASR 任务失败",retryable:["InternalError","SERVER_ERROR","Throttling"].contains(where:{event.error?.contains($0) == true})); return
     case .ignored: break
     }
    }
   } catch {
-   if state != .finished && state != .failed { await fail("ASR 连接中断或协议错误。请检查网络、Key 与模型；未确认结果将标记缺失。") }
+   if state != .finished && state != .failed { await fail("ASR 连接中断或协议错误。未确认结果已标记缺失。",retryable:ASRNetworkFailure.retryable(error,httpStatus:(socket?.response as? HTTPURLResponse)?.statusCode)) }
   }
  }
 }
@@ -193,13 +250,34 @@ struct AudioPacket: Sendable { let data: Data; let offset: Double }
 final class AudioIngress: @unchecked Sendable {
  let stream: AsyncStream<AudioPacket>
  private let continuation: AsyncStream<AudioPacket>.Continuation
+ private let lock = NSLock()
+ private var closed = false
+ enum Offer { case accepted, overflow, closed }
  init() {
   var captured: AsyncStream<AudioPacket>.Continuation!
   stream = AsyncStream(bufferingPolicy:.bufferingOldest(100)) { captured = $0 }
   continuation = captured
  }
- func yield(_ packet: AudioPacket) -> Bool {
-  switch continuation.yield(packet) { case .enqueued: return true; case .dropped, .terminated: return false; @unknown default: return false }
+ func offer(_ packet: AudioPacket) -> Offer {
+  lock.lock(); defer { lock.unlock() }
+  guard !closed else { return .closed }
+  switch continuation.yield(packet) {
+  case .enqueued: return .accepted
+  case .dropped: closed = true; continuation.finish(); return .overflow
+  case .terminated: closed = true; return .closed
+  @unknown default: closed = true; continuation.finish(); return .overflow
+  }
  }
- func finish() { continuation.finish() }
+ func yield(_ packet: AudioPacket) -> Bool { offer(packet) == .accepted }
+ func finish() { lock.lock(); defer { lock.unlock() }; closed = true; continuation.finish() }
+}
+
+// Development-only opaque CONNECT proxy; no credentials or TLS plaintext are logged.
+// Enabled only by explicit launch arguments, never stored as an application preference.
+enum VerificationNetwork {
+ static func configure(_ configuration: URLSessionConfiguration) {
+  let args = CommandLine.arguments
+  guard args.contains("--verify-network"), let index = args.firstIndex(of:"--verify-network-proxy-port"), args.indices.contains(index+1), let port = Int(args[index+1]), (1024...65535).contains(port) else { return }
+  configuration.connectionProxyDictionary = ["HTTPEnable":1,"HTTPProxy":"127.0.0.1","HTTPPort":port,"HTTPSEnable":1,"HTTPSProxy":"127.0.0.1","HTTPSPort":port]
+ }
 }
