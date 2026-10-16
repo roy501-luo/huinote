@@ -24,3 +24,5 @@ Verification/Fixtures/
 *.ogg
 
 __pycache__/
+
+exports/

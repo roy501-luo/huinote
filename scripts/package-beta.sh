@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -eu
 cd "${0:A:h:h}"
-VERSION=v0.2.0
+VERSION=v0.2.1
 ROOT="$PWD/dist/huinote-stage"
 MEETING_BUILD_CONFIGURATION=release MEETING_APP_OUTPUT="$ROOT/HuiNote · 会记.app" ./scripts/build.sh
 cp docs/INSTALL.md "$ROOT/INSTALL.md"

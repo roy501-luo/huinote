@@ -6,7 +6,7 @@
 
 ![HuiNote 功能示意](https://github.com/user-attachments/assets/ad4760ae-78c5-4c94-8d63-d9496f3baab1)
 
-[下载 v0.2.0](https://github.com/roy501-luo/huinote/releases/tag/v0.2.0) · [安装指南](docs/INSTALL.md) · [反馈问题](https://github.com/roy501-luo/huinote/issues)
+[下载 v0.2.1](https://github.com/roy501-luo/huinote/releases/tag/v0.2.1) · [安装指南](docs/INSTALL.md) · [反馈问题](https://github.com/roy501-luo/huinote/issues)
 
 原生 macOS AI 会议助手，让录音、转写、笔记和总结留在同一个工作空间。
 
@@ -25,7 +25,7 @@ Apple Silicon · macOS 14+ · 自备百炼 Key
 
 ## 三步开始
 
-1. [下载安装包](https://github.com/roy501-luo/huinote/releases/tag/v0.2.0)，将「HuiNote · 会记.app」放入「应用程序」。
+1. [下载安装包](https://github.com/roy501-luo/huinote/releases/tag/v0.2.1)，将「HuiNote · 会记.app」放入「应用程序」。
 2. 打开设置，填写自己的百炼北京地域 ASR 和 LLM Key。
 3. 戴上耳机，授权录音，开始第一场会议。
 
