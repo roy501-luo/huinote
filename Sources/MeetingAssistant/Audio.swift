@@ -121,6 +121,23 @@ final class AudioWriter: @unchecked Sendable {
   return output
  }
 }
+// The system may never invoke stop completion after display/capture invalidation.
+final class CaptureStopGate: @unchecked Sendable {
+ private let lock = NSLock()
+ private var continuation: CheckedContinuation<String?,Never>?
+ init(_ continuation: CheckedContinuation<String?,Never>) { self.continuation = continuation }
+ func finish(_ message: String?) {
+  lock.lock(); let pending = continuation; continuation = nil; lock.unlock()
+  pending?.resume(returning:message)
+ }
+ static func wait(timeout: Double = 5, start: (@escaping (String?)->Void)->Void) async -> String? {
+  await withCheckedContinuation { continuation in
+   let gate = CaptureStopGate(continuation)
+   start { gate.finish($0) }
+   DispatchQueue.global().asyncAfter(deadline:.now()+timeout) { gate.finish("停止采集超时，已关闭本地写入；请核对音源缺失") }
+  }
+ }
+}
 final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
  static var microphoneDevices: [AVCaptureDevice] { AVCaptureDevice.devices(for:.audio) }
  let writer = AudioWriter()
@@ -188,9 +205,15 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
   if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver); self.configurationObserver = nil }
   engine?.inputNode.removeTap(onBus:0); engine?.stop(); engine = nil
   if let stream {
-   do { try await stream.stopCapture() } catch { writer.report("system","停止系统采集失败：\(error.localizedDescription)") }
+   // Detach outputs before waiting; a late system callback cannot write into a later meeting.
+   try? stream.removeStreamOutput(self,type:.audio)
+   if #available(macOS 15.0, *) { try? stream.removeStreamOutput(self,type:.microphone) }
+   self.stream = nil
+   let message = await CaptureStopGate.wait { completion in
+    stream.stopCapture { error in completion(error.map { "停止系统采集失败："+$0.localizedDescription }) }
+   }
+   if let message { writer.report("system",message) }
   }
-  stream = nil
   await withCheckedContinuation { c in captureQueue.async { c.resume() } }
   await writer.finish()
  }

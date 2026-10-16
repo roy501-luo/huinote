@@ -19,6 +19,7 @@ import UniformTypeIdentifiers
  @Published var searchHits: [String:MeetingSearchHit] = [:]
  @Published var question = ""
  @Published var speakerPanelVisible = false
+ @Published var speakerEditTarget: Int?
  @Published var notesVisible = false
  @Published var summarySourcesVisible = false
  @Published var summaryReferenceIDs: [String] = []
@@ -115,6 +116,7 @@ import UniformTypeIdentifiers
  private var networkStart: Task<Void,Never>?
  private var liveSessions: [String:LiveASRSession] = [:]
  private var repairTimer: Timer?
+ private let recordingActivity = RecordingActivity()
  private var liveGapIDs: [String:String] = [:]
  private var interimSavedAt: [String:Double] = [:]
  private var captureSessionStarted = ProcessInfo.processInfo.systemUptime
@@ -126,6 +128,7 @@ import UniformTypeIdentifiers
  init() {
   do {
    store = try Store()
+   try store?.curateHistoricalKeywords()
 
    for var meeting in try store?.list() ?? [] {
     if let status = meeting.post?.status, ["准备单声道", "上传百炼", "会后识别与", "生成纪要"].contains(where:{status.hasPrefix($0)}) {
@@ -172,6 +175,7 @@ import UniformTypeIdentifiers
   repairTimer?.tolerance = 3
  }
  private func updateRecordingTimer() {
+  recordingActivity.update(recording:recording,paused:recordingPaused)
   timer?.invalidate(); timer = nil
   guard recording && !recordingPaused else { return }
   now = Date()
@@ -491,6 +495,8 @@ import UniformTypeIdentifiers
   busy = true; filePlaybackStopping = true
   if !recordingPaused {
   recordingEnd = ProcessInfo.processInfo.systemUptime-origin
+  liveMeeting?.duration = recordingEnd ?? 0
+  liveMeeting?.status = "正在收尾"; saveRecording()
   await capture.stop() // Flush resampler and packet tail before closing the bounded streams.
   liveMeeting?.duration = recordingEnd ?? 0
   liveMeeting?.status = "收齐转写尾部"; saveRecording()
@@ -639,7 +645,7 @@ import UniformTypeIdentifiers
       try Task.checkCancellation()
       var updated = original
       updated.summaryBatchID = job.id
-      updated.keywords = await service.generatedKeywords; updated.keywordsGeneratedAt = Date()
+      if updated.keywordsManuallyEdited != true { updated.keywords = await service.generatedKeywords }; updated.keywordsGeneratedAt = Date()
       updated.post?.minutes = result; updated.post?.minutesTemplate = job.template; updated.post?.minutesModel = configuration.model
       updated.post?.minutesBasis = lines.map { $0.id+":"+$0.text }.joined(separator:"\n")
       if let title = await service.generatedTitle { updated.title = title }
@@ -752,6 +758,12 @@ import UniformTypeIdentifiers
      if meeting.plaud != nil && imported == nil { throw AppFailure(message:"Plaud 原始录音已移动或缺失；仍可基于已导入转写重生成纪要") }
      let mix = try await Task.detached { try MeetingMix.make(folder:folder,imported:imported) }.value
      try Task.checkCancellation()
+     if !mix.hasSignal {
+      working.post?.status = "无有效音频 · 已跳过生成"
+      working.post?.warning = "录音为静音或接近数字零值，未上传识别。原始录音和已有总结保留。"
+      working.automaticRepair = false; working.repairAfter = nil; working.repairAttempts = nil
+      await asr.close(); await llm.close(); return
+     }
      working.post?.warning = mix.warning + (meeting.plaud == nil ? " 混音中的重叠人声可能造成漏字或编号错误；请结合实时保留稿核对。" : " 重叠人声可能造成漏字或编号错误，请结合原录音核对；Plaud 来源文件保留。")
      postProgress = "上传百炼临时 OSS…"; working.post?.status = postProgress; persist()
      task = try await asr.submit(file:mix.url,configuration:c); base = c.base
@@ -784,7 +796,7 @@ import UniformTypeIdentifiers
    try Task.checkCancellation()
    working.post?.minutesTemplate = template; working.post?.minutesModel = c.model
    if let title = await llm.generatedTitle { working.title = title }
-   working.keywords = await llm.generatedKeywords; working.keywordsGeneratedAt = Date()
+   if working.keywordsManuallyEdited != true { working.keywords = await llm.generatedKeywords }; working.keywordsGeneratedAt = Date()
    working.post?.minutes = result; working.post?.minutesBasis = lines.map { $0.id+":"+$0.text }.joined(separator:"\n")
    working.post?.status = "会后处理完成 · 纪要待核对"
    if working.plaud != nil { working.status = "Plaud · 已完成" }

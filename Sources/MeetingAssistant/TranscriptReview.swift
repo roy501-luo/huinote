@@ -103,12 +103,13 @@ struct SpeakerSidebar: View {
   VStack(alignment:.leading,spacing:12) {
    HStack { Label("发言人",systemImage:"person.2").font(.headline); Spacer(); Button { model.speakerPanelVisible = false } label: { Image(systemName:"sidebar.right") }.buttonStyle(.plain).help("收起发言人") }
    Button("显示全部发言") { model.reviewSpeaker = "all" }.buttonStyle(.borderless)
+   ScrollViewReader { proxy in
    ScrollView {
     VStack(spacing:12) {
      ForEach(groups,id:\.0) { id, sentences in
       VStack(alignment:.leading,spacing:8) {
        HStack { Circle().fill(SpeakerPalette.color(id)).frame(width:9,height:9); Text("说话人 \(id + (model.current?.post?.speakerNumberOffset ?? 1))").font(.caption.bold()); Spacer(); Text("\(sentences.count)句").font(.caption).foregroundStyle(.secondary) }
-       TextField("姓名或身份",text:Binding(get:{model.current?.post?.speakerNames[String(id)] ?? ""},set:{model.renameSpeaker(id,to:$0)})).textFieldStyle(.roundedBorder).disabled(locked)
+       SpeakerNameEditor(speaker:id,saved:model.current?.post?.speakerNames[String(id)] ?? "",locked:locked).id("\(model.current?.id ?? "")-\(id)")
        HStack {
         Button(model.reviewSpeaker == String(id) ? "显示全部" : "只看此人") { model.reviewSpeaker = model.reviewSpeaker == String(id) ? "all" : String(id) }.buttonStyle(.borderless)
         Spacer()
@@ -116,10 +117,13 @@ struct SpeakerSidebar: View {
          Button("试听",systemImage:"play.circle") { model.reviewQuery = ""; model.reviewSpeaker = "all"; model.focusedSentence = sample.id; model.citationScrollToken = UUID(); playback.play(at:sample.begin) }.buttonStyle(.borderless).disabled(locked)
         }
        }.font(.caption)
-      }.padding(12).background(SpeakerPalette.color(id).opacity(model.reviewSpeaker == String(id) ? 0.13 : 0.05),in:RoundedRectangle(cornerRadius:9))
+      }.padding(12).background(SpeakerPalette.color(id).opacity(model.reviewSpeaker == String(id) ? 0.13 : 0.05),in:RoundedRectangle(cornerRadius:9)).id(id)
      }
      if groups.isEmpty { Text("会后识别完成后，可在这里核对发言人。").font(.caption).foregroundStyle(.secondary) }
     }
+   }
+   .onAppear { if let id = model.speakerEditTarget { proxy.scrollTo(id,anchor:.center) } }
+   .onChange(of:model.speakerEditTarget) { _,id in if let id { proxy.scrollTo(id,anchor:.center) } }
    }
    if playback.playing { Button("暂停试听",action:playback.pause).buttonStyle(.borderless) }
    if model.summaryAfterSpeakerReview {
@@ -127,7 +131,7 @@ struct SpeakerSidebar: View {
     Button("返回生成设置") { model.summaryAfterSpeakerReview = false; playback.pause(); model.requestSummary() }.buttonStyle(.borderedProminent).disabled(locked)
     Button("稍后生成") { model.summaryAfterSpeakerReview = false }.buttonStyle(.borderless)
    }
-   Text("改名自动保存并应用于本场全部同编号发言。").font(.caption).foregroundStyle(.secondary)
+   Text("输入后按回车或点击保存，统一应用于本场同编号发言。").font(.caption).foregroundStyle(.secondary)
   }.padding(14).frame(width:235).background(Color.primary.opacity(0.025),in:RoundedRectangle(cornerRadius:10))
  }
 }
@@ -147,5 +151,32 @@ struct SummarySourcePane: View {
    if model.focusedSentence == "N1" { ScrollView { Text(model.current?.noteText ?? "").textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading) } }
    else { FinalTranscriptView() }
   }.padding(.trailing,12).frame(minWidth:280,maxWidth:.infinity,maxHeight:.infinity)
+ }
+}
+
+struct SpeakerNameEditor: View {
+ @EnvironmentObject var model: Model
+ let speaker: Int
+ let saved: String
+ let locked: Bool
+ @State private var draft: String
+ @FocusState private var focused: Bool
+ init(speaker: Int, saved: String, locked: Bool) {
+  self.speaker = speaker; self.saved = saved; self.locked = locked
+  _draft = State(initialValue:saved)
+ }
+ var body: some View {
+  VStack(alignment:.leading,spacing:6) {
+   TextField("姓名或身份",text:$draft).textFieldStyle(.roundedBorder).focused($focused).disabled(locked).onSubmit(commit)
+   if draft != saved {
+    HStack { Button("保存",action:commit).disabled(locked); Button("取消") { draft = saved }; Text("未保存").font(.caption2).foregroundStyle(.secondary) }.controlSize(.small)
+   }
+  }
+  .onAppear { if model.speakerEditTarget == speaker { focused = true } }
+  .onChange(of:model.speakerEditTarget) { _, value in if value == speaker { focused = true } }
+ }
+ private func commit() {
+  guard !locked, draft != saved else { return }
+  model.renameSpeaker(speaker,to:draft); draft = draft.trimmingCharacters(in:.whitespacesAndNewlines)
  }
 }

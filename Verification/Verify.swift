@@ -6,6 +6,20 @@ import AVFoundation
  }
  static func requireThrowing(_ condition: Bool, _ message: String) throws { try require(condition,message) }
  static func main() async throws {
+  let missingStop = await CaptureStopGate.wait(timeout:0.02) { _ in }
+  assert(missingStop != nil)
+  let successfulStop = await CaptureStopGate.wait(timeout:0.02) { done in done(nil); done("late duplicate") }
+  assert(successfulStop == nil)
+  try await Task.sleep(nanoseconds:50_000_000)
+
+  assert(!MeetingMix.containsSignal(Data(repeating:0,count:32000)))
+  let noise:[Int16] = [0,1,-1,2,-2]
+  assert(!MeetingMix.containsSignal(noise.withUnsafeBytes { Data($0) }))
+  let quiet:[Int16] = [0,3,-3]
+  assert(MeetingMix.containsSignal(quiet.withUnsafeBytes { Data($0) }))
+  let minimum:[Int16] = [Int16.min]
+  assert(MeetingMix.containsSignal(minimum.withUnsafeBytes { Data($0) }))
+
   try await verifyLiveRecovery()
   let cues = [PlaybackCue(id:"a",begin:1,end:3),PlaybackCue(id:"b",begin:3,end:5),PlaybackCue(id:"overlap",begin:4,end:6)]
   try require(PlaybackTimeline.active(cues,at:0).isEmpty,"句前静音不应高亮")
@@ -80,6 +94,20 @@ import AVFoundation
   try requireThrowing(try reopenedTags.list().first?.customKeywords?.count == 1,"旧归类迁移幂等失败")
   try requireThrowing(try reopenedTags.list().first?.post?.minutes == "原总结保留","旧归类迁移不得改写总结")
   print("PASS 检索词事实约束/去重/长短词搜索/删除索引/重开/总结保留")
+  tagged.keywords = [.init(category:"主题",text:"第2.1节"),.init(category:"项目",text:"鸭嘴钳"),.init(category:"项目",text:"源图谱")]
+  tagged.customKeywords = [.init(category:"自定义",text:"workflow")]
+  try reopenedTags.save(tagged)
+  try reopenedTags.curateHistoricalKeywords()
+  let curatedMeeting = try reopenedTags.list().first!
+  try require(curatedMeeting.customKeywords == tagged.customKeywords && curatedMeeting.post?.minutes == tagged.post?.minutes,"历史整理必须保留手动词和总结")
+  try require(curatedMeeting.keywords?.contains(where:{$0.text == "第2.1节"}) == false,"章节编号应过滤")
+  try require(curatedMeeting.keywords?.contains(.init(category:"主题",text:"鸭嘴钳")) == true,"普通名词不得归入项目")
+  try requireThrowing(try reopenedTags.search("源图谱").count == 1,"整理后索引必须更新")
+  try requireThrowing(try reopenedTags.search("workflow").count == 1,"手动词不能被自动过滤")
+  try reopenedTags.curateHistoricalKeywords()
+  try requireThrowing(try reopenedTags.list().first?.keywords == curatedMeeting.keywords,"历史整理必须幂等")
+  try require(MeetingKeyword.featured(automatic:words,manual:tagged.customKeywords ?? []).first?.text == "workflow","精选应优先保留手动词")
+  print("PASS 历史标签整理/手动词保留/总结保留/搜索索引/幂等")
   let mediaInput = root.appendingPathComponent("import-test.wav")
   let mediaFormat = AVAudioFormat(standardFormatWithSampleRate:16000,channels:1)!
   let mediaBuffer = AVAudioPCMBuffer(pcmFormat:mediaFormat,frameCapacity:16000)!

@@ -5,7 +5,7 @@ struct AudioSegment: Codable {
  var file: String
  var start: Double
 }
-struct MixResult { var url: URL; var warning: String; var seconds: Double }
+struct MixResult { var url: URL; var warning: String; var seconds: Double; var hasSignal: Bool = true }
 enum MeetingMix {
  // Files are resampled sequentially to disk; the mixing buffer is bounded to one second.
  static func make(folder: URL, imported: URL? = nil) throws -> MixResult {
@@ -13,6 +13,7 @@ enum MeetingMix {
   let manifest = folder.appendingPathComponent("segments.json")
   let files = try imported.map { [$0] } ?? manager.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil).filter { $0.pathExtension == "caf" && ($0.lastPathComponent.hasPrefix("system-") || $0.lastPathComponent.hasPrefix("microphone-")) }
   guard !files.isEmpty else { throw AppFailure(message:"没有本地录音文件") }
+  var hasSignal = false
   var warning = imported == nil ? "" : "导入的单路音轨。"
   let segments: [AudioSegment]
   if let imported {
@@ -49,9 +50,9 @@ enum MeetingMix {
      try Task.checkCancellation(); try file.read(into:buffer,frameCount:AVAudioFrameCount(min(Int64(buffer.frameCapacity),file.length-consumed)))
      if buffer.frameLength == 0 { break }
      consumed += Int64(buffer.frameLength)
-     let bytes = try encoder.convert(buffer); try handle.write(contentsOf:bytes); size += Int64(bytes.count)
+     let bytes = try encoder.convert(buffer); hasSignal = hasSignal || containsSignal(bytes); try handle.write(contentsOf:bytes); size += Int64(bytes.count)
     }
-    let tail = try encoder.flush(); try handle.write(contentsOf:tail); size += Int64(tail.count)
+    let tail = try encoder.flush(); hasSignal = hasSignal || containsSignal(tail); try handle.write(contentsOf:tail); size += Int64(tail.count)
     try handle.close()
    } catch { try? handle.close(); throw error }
    let start = Int64((segment.start*16000).rounded())
@@ -87,7 +88,14 @@ enum MeetingMix {
   let result = folder.appendingPathComponent("meeting-mono.wav")
   if manager.fileExists(atPath:result.path) { _ = try manager.replaceItemAt(result,withItemAt:staged) }
   else { try manager.moveItem(at:staged,to:result) }
-  return MixResult(url:result,warning:warning,seconds:Double(total)/16000)
+  return MixResult(url:result,warning:warning,seconds:Double(total)/16000,hasSignal:hasSignal)
+ }
+ // Conservative digital-silence gate, not speech detection. Keep quiet speech and all timestamps.
+ static func containsSignal(_ data: Data) -> Bool {
+  data.withUnsafeBytes { raw in
+   for i in 0..<data.count/2 { if abs(Int(Int16(littleEndian:raw.loadUnaligned(fromByteOffset:i*2,as:Int16.self)))) > 2 { return true } }
+   return false
+  }
  }
  static func wavHeader(samples: UInt32) -> Data {
   var data = Data()

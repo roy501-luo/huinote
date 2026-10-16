@@ -4,6 +4,7 @@ extension Model {
  func saveKeywords(_ automatic: [MeetingKeyword], manual: [MeetingKeyword]) {
   current?.keywords = MeetingKeyword.normalize(automatic)
   current?.customKeywords = MeetingKeyword.normalize(manual)
+  current?.keywordsManuallyEdited = true
   save()
  }
 }
@@ -23,14 +24,13 @@ struct KeywordSection: View {
    }
    if words.isEmpty { Text(meeting.keywordsGeneratedAt == nil ? "生成总结时自动提取，可通过编辑补充。" : "未提取到明确检索词，可手动添加。").font(.caption).foregroundStyle(.secondary) }
    if !expanded {
-    ScrollView(.horizontal,showsIndicators:false) {
-     HStack(spacing:8) {
-      ForEach(words.prefix(8)) { word in
-       Button(word.text) { model.query = word.text }.font(.caption).buttonStyle(.borderless)
-      }
-      if words.count > 8 { Button("全部 \(words.count) 个") { expanded = true }.font(.caption) }
+    LazyVGrid(columns:Array(repeating:GridItem(.flexible(),alignment:.leading),count:4),alignment:.leading,spacing:8) {
+     ForEach(MeetingKeyword.featured(automatic:meeting.keywords ?? [],manual:meeting.customKeywords ?? [])) { word in
+      chip(word)
      }
     }
+    if words.count > 8 { Button("查看全部（\(words.count)）") { expanded = true }.font(.caption).buttonStyle(.borderless) }
+
    } else {
    ForEach(MeetingKeyword.categories,id:\.self) { category in
     let group = words.filter{$0.category == category}
@@ -39,7 +39,7 @@ struct KeywordSection: View {
       Text(category).font(.caption).foregroundStyle(.secondary).frame(width:66,alignment:.leading)
       LazyVGrid(columns:[GridItem(.adaptive(minimum:110),alignment:.leading)],alignment:.leading,spacing:8) {
        ForEach(group) { word in
-        Button { model.query = word.text } label: {
+        Button { model.query = word.text; model.showingSearch = true } label: {
          Text(word.text).font(.callout).lineLimit(2).padding(.horizontal,9).padding(.vertical,5).background(Color.accentColor.opacity(0.08),in:RoundedRectangle(cornerRadius:6))
         }.buttonStyle(.plain).help("搜索相关会议")
        }
@@ -49,8 +49,15 @@ struct KeywordSection: View {
    }
     Button("收起") { expanded = false }.font(.caption)
    }
-  }.sheet(isPresented:$editing) { KeywordEditor(meeting:meeting) }
+  }.onChange(of:meeting.id) { _,_ in expanded = false }.sheet(isPresented:$editing) { KeywordEditor(meeting:meeting) }
  }
+ private func chip(_ word: MeetingKeyword) -> some View {
+  Button { model.query = word.text; model.showingSearch = true } label: {
+   Text(word.text).font(.callout).lineLimit(1).truncationMode(.tail).padding(.horizontal,9).padding(.vertical,5)
+    .frame(maxWidth:.infinity,alignment:.leading).background(Color.accentColor.opacity(0.08),in:RoundedRectangle(cornerRadius:6)).contentShape(Rectangle())
+  }.buttonStyle(.plain).help(word.category+"："+word.text+" · 搜索相关会议")
+ }
+
 }
 private struct KeywordEditor: View {
  @EnvironmentObject var model: Model

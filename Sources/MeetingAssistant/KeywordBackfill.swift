@@ -22,7 +22,7 @@ actor HistoricalKeywordService {
    let result = try JSONDecoder().decode(Result.self,from:Data(text.utf8))
    words += MeetingKeyword.grounded(result.keywords,in:sources)
   }
-  return MeetingKeyword.normalize(words)
+  return MeetingKeyword.curated(words)
  }
 }
 

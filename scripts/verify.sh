@@ -6,3 +6,5 @@ swiftc -swift-version 5 -module-cache-path "$PWD/.build/ModuleCache" -I Sources/
 .build/verification/verify
 swiftc -swift-version 5 -module-cache-path "$PWD/.build/ModuleCache" -parse-as-library Sources/MeetingAssistant/NoteComposer.swift Verification/VerifyNoteEditor.swift -o .build/verification/note-editor
 .build/verification/note-editor
+swiftc -swift-version 5 -module-cache-path "$PWD/.build/ModuleCache" Sources/MeetingAssistant/RecordingActivity.swift Verification/VerifyRecordingActivity.swift -o .build/verification/recording-activity
+.build/verification/recording-activity

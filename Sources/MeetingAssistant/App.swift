@@ -15,7 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 @main struct MeetingAssistantApp: App {
  @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
- @StateObject private var model = Model()
+ @StateObject private var model: Model
+ init() { SingleInstance.acquire(); _model = StateObject(wrappedValue:Model()) }
  var body: some Scene {
   Window("HuiNote · 会记",id:"main") {
    ContentView().environmentObject(model).frame(minWidth:1080,minHeight:640)
@@ -403,6 +404,18 @@ struct FinalTranscriptView: View {
  private var visibleSentences: [FinalSentence] { (model.current?.post?.sentences ?? []).filter { model.reviewSpeaker == "all" || String($0.speaker ?? -1) == model.reviewSpeaker } }
  private var cues: [PlaybackCue] { visibleSentences.map { PlaybackCue(id:$0.id,begin:$0.begin,end:$0.end) } }
  private var active: [String] { guard playback.hasPosition else { return [] }; return PlaybackTimeline.active(cues,at:playback.position) }
+ @ViewBuilder private func sentenceHeader(_ sentence: FinalSentence) -> some View {
+HStack {
+        Button { follow = true; playback.play(at:sentence.begin); model.focusedSentence = nil } label: { Label(sentence.timeLabel,systemImage:"play.fill").monospacedDigit().padding(.horizontal,8).frame(minHeight:28).background(Color.accentColor.opacity(0.08),in:RoundedRectangle(cornerRadius:6)).contentShape(Rectangle()) }.buttonStyle(.plain).foregroundStyle(Color.accentColor).font(.caption).disabled(model.recording || (model.busy && !model.batchRunning) || model.postProcessing).help("从此处播放")
+        if let speaker = sentence.speaker {
+         Button { model.speakerEditTarget = nil; model.openSpeakerReview(); model.speakerEditTarget = speaker } label: { HStack(spacing:5) { Circle().fill(SpeakerPalette.color(speaker)).frame(width:7,height:7); Text(model.current?.post?.name(speaker) ?? "说话人").font(.caption.bold()).foregroundStyle(SpeakerPalette.color(speaker)) }.padding(.horizontal,8).frame(minHeight:28).background(SpeakerPalette.color(speaker).opacity(0.08),in:RoundedRectangle(cornerRadius:6)).contentShape(Rectangle()) }.buttonStyle(.plain).help("修改本场发言人姓名").disabled(model.recording || model.postProcessing || model.currentSummaryLocked || model.qaBusy)
+        } else { Text("说话人未识别").font(.caption) }
+        Button { editingSentence = sentence } label: { Label("校对",systemImage:"pencil").padding(.horizontal,8).frame(minHeight:28).contentShape(Rectangle()) }.buttonStyle(.plain).foregroundStyle(.secondary).font(.caption).help("校对本句文字").disabled(model.recording || model.postProcessing || model.currentSummaryLocked || model.qaBusy)
+        if sentence.originalText != nil { Text("已校对").font(.caption2).foregroundStyle(.secondary) }
+        Spacer()
+        Text(active.contains(sentence.id) ? "当前播放" : "").font(.caption2).foregroundStyle(Color.accentColor).frame(width:55)
+       }
+ }
  var body: some View {
   ScrollViewReader { proxy in
    VStack(alignment:.leading,spacing:12) {
@@ -412,16 +425,14 @@ struct FinalTranscriptView: View {
      if model.current?.post?.sentences.isEmpty ?? true { Text("会后识别完成后，带说话人编号的句子将显示在这里。实时稿仍可切换查看。").foregroundStyle(.secondary) }
      ForEach(visibleSentences) { sentence in
       VStack(alignment:.leading,spacing:8) {
-       HStack {
-        Button { follow = true; playback.play(at:sentence.begin); model.focusedSentence = nil } label: { Text("\(sentence.timeLabel)").monospacedDigit() }.buttonStyle(.plain).foregroundStyle(Color.accentColor).font(.caption).disabled(model.recording || (model.busy && !model.batchRunning) || model.postProcessing).help("从此处播放")
-        if let speaker = sentence.speaker {
-         HStack(spacing:5) { Circle().fill(SpeakerPalette.color(speaker)).frame(width:7,height:7); Text(model.current?.post?.name(speaker) ?? "说话人").font(.caption.bold()).foregroundStyle(SpeakerPalette.color(speaker)) }
-        } else { Text("说话人未识别").font(.caption) }
-        Spacer()
-        Text(active.contains(sentence.id) ? "当前播放" : "").font(.caption2).foregroundStyle(Color.accentColor).frame(width:55)
-       }
-       SearchHighlight(text:sentence.text,query:model.reviewQuery).textSelection(.enabled).lineSpacing(5)
-       HStack { if sentence.originalText != nil { Text("已校对").font(.caption2).foregroundStyle(.secondary) }; Spacer(); Button("校对文字") { editingSentence = sentence }.buttonStyle(.borderless).font(.caption).opacity(hoveredSentence == sentence.id ? 1 : 0).disabled(model.recording || model.postProcessing || model.currentSummaryLocked || model.qaBusy) }
+       sentenceHeader(sentence)
+       TranscriptTextClick(text:sentence.text,query:model.reviewQuery,highlighted:active.contains(sentence.id)) {
+         guard !model.recording, !(model.busy && !model.batchRunning), !model.postProcessing, !playback.loading else { return }
+         follow = false
+         playback.seek(sentence.begin)
+        }
+        .help("点击定位到本句录音；拖动可选择文字")
+
       }.padding(.horizontal,10).padding(.vertical,6).frame(maxWidth:.infinity,alignment:.leading).background(active.contains(sentence.id) || (!playback.playing && model.focusedSentence == sentence.id) ? Color.accentColor.opacity(0.08) : Color.clear,in:RoundedRectangle(cornerRadius:5)).onHover { hoveredSentence = $0 ? sentence.id : nil }.contextMenu { Button("校对文字") { editingSentence = sentence }.disabled(model.recording || model.postProcessing || model.currentSummaryLocked || model.qaBusy) }.id(sentence.id)
      }
     }

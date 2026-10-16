@@ -301,7 +301,7 @@ actor MinutesService {
     do {
      let parsed = try JSONDecoder().decode(MinuteResponse.self,from:Data(text.utf8))
      accepted = try Self.validate(parsed,evidence:chunk)
-     generatedKeywords = MeetingKeyword.normalize(generatedKeywords + MeetingKeyword.grounded(parsed.keywords ?? [],in:chunk))
+     generatedKeywords = MeetingKeyword.curated(generatedKeywords + MeetingKeyword.grounded(parsed.keywords ?? [],in:chunk))
      if let title = Self.cleanTitle(parsed.title) { titles.append(title) }
      break
     } catch { lastError = error; rejectedResponse = text }

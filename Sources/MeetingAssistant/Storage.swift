@@ -28,6 +28,7 @@ struct Meeting: Identifiable, Codable {
  var keywords: [MeetingKeyword]?
  var customKeywords: [MeetingKeyword]?
  var keywordsGeneratedAt: Date?
+ var keywordsManuallyEdited: Bool?
 }
 struct MeetingNote: Identifiable, Codable, Equatable {
  var id = UUID().uuidString
